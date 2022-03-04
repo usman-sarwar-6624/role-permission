@@ -1,0 +1,73 @@
+version: '3.9'
+services:
+  backend:
+    container_name: lumen
+    build:
+      context: ./backend
+      dockerfile: DockerFile
+    ports:
+      - 8000:8000
+    working_dir: /var/www/html
+    volumes:
+      - ./backend:/var/www/html
+      - /var/www/html/vendor/
+      - ./docker/server/apache/sites-enabled:/etc/apache2/sites-enabled
+      - ./docker/server/php/php.ini:/usr/local/etc/php/conf.d/extra-php-config.ini
+    depends_on:
+      - api_db
+    networks:
+      - app
+  frontend:
+    container_name: react
+    build:
+       context: ./frontend
+       dockerfile: DockerFile
+    tty: true
+    ports:
+      - 3000:3000
+    volumes:
+      - ./frontend:/var/www/html/frontend
+    depends_on:
+      - backend
+    networks:
+      - app
+
+  api_db:
+    networks:
+      - app
+    image: mariadb:10.5.9
+    container_name: api_db
+    restart: always
+    volumes:
+        - db_data:/var/lib/mysql
+        - ./docker/db/mariadb/my.cnf:/etc/mysql/conf.d/my.cnf
+    environment:
+        MYSQL_DATABASE: ${DB_DATABASE}
+        MYSQL_ROOT_PASSWORD: 123456
+        MYSQL_PASSWORD: ${DB_USERNAME}
+        MYSQL_USER: ${DB_PASSWORD}
+    ports:
+        - "33061:3306"
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:5
+    environment:
+        - PMA_ARBITRARY=1
+        - PMA_HOST=api_db
+        - PMA_USER=${DB_USERNAME}
+        - PMA_PASSWORD=${DB_PASSWORD}
+        - PMA_PORT=${DB_PORT}
+    depends_on:
+        - api_db
+    volumes:
+          - db_admin_data:/var/www/html
+    ports:
+        - 8081:80
+    networks:
+        - app
+volumes:
+  db_data:
+  db_admin_data:
+
+networks:
+  app:
+    driver: bridge
